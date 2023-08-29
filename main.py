@@ -1,11 +1,20 @@
 from bardapi import BardAsync
-import configparser 
-import discord 
+import discord
 from discord.ext import commands
+import configparser
+import os
+import json
+from dotenv import load_dotenv
+load_dotenv()
+
+BARD_TOKEN = os.environ["BARD_TOKEN"] 
+DISCORD_BOT_TOKEN = os.environ["DISCORD_BOT_TOKEN"] 
 
 config = configparser.ConfigParser()
 config.read('config.ini')
-BARD_TOKEN = config["TOKENS"]['bard_token']
+trigger_words = json.loads(config["SETTINGS"]['trigger_words'])
+print(trigger_words)
+
 bard = BardAsync(token=BARD_TOKEN)
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="!", intents=intents, heartbeat_timeout=60)
@@ -85,12 +94,28 @@ async def private(interaction: discord.Interaction):
     write_config(config)
     return
 
+
+def check_for_trigger_words(message, trigger_words):
+    for word in trigger_words:
+        print(f"Checking for {word}")
+        if word.lower() in message.lower():
+            print("Trigger word found!!!")
+            return True
+        print("No Trigger word found")
+    return False
+        
+
 @bot.event
 async def on_message(message):
     config = read_config()
     if config.getboolean("SETTINGS", "reply_all"):
         if message.author == bot.user:
             return
+        print(f"Message from {message.author}: {message.content}")
+        if not check_for_trigger_words(message.content, trigger_words):
+            print("Trigger Words Not Found")
+            return
+
         async with message.channel.typing():
             response = await generate_response(message.content)
             if len(response['content']) > 2000:
@@ -132,4 +157,4 @@ def write_config(config):
     with open("config.ini", "w") as configfile:
         config.write(configfile)
 
-bot.run(config["TOKENS"]['discord_bot_token'])
+bot.run(DISCORD_BOT_TOKEN)
